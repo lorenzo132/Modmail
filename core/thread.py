@@ -10,6 +10,8 @@ import typing
 import warnings
 from datetime import timedelta
 from types import SimpleNamespace
+import os
+import json
 
 import isodate
 
@@ -1275,13 +1277,56 @@ class Thread:
 class ThreadManager:
     """Class that handles storing, finding and creating Modmail threads."""
 
+    USER_CACHE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp", "usercache.json")
+
     def __init__(self, bot):
         self.bot = bot
         self.cache = {}
+        self._load_user_cache()
+
+    def _load_user_cache(self):
+        os.makedirs(os.path.dirname(self.USER_CACHE_FILE), exist_ok=True)
+        if os.path.exists(self.USER_CACHE_FILE):
+            try:
+                with open(self.USER_CACHE_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for k, v in data.items():
+                    self.cache[int(k)] = None
+            except Exception as e:
+                logger.error(f"Failed to load user cache: {e}")
+
+    def _save_user_cache(self):
+        try:
+            with open(self.USER_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump({str(k): None for k in self.cache.keys()}, f)
+        except Exception as e:
+            logger.error(f"Failed to save user cache: {e}")
+
+    async def cache_all_users(self):
+        """Cache every user in every guild the bot is in, writing all users to the user cache file."""
+        os.makedirs(os.path.dirname(self.USER_CACHE_FILE), exist_ok=True)
+        user_data = {}
+        for guild in self.bot.guilds:
+            for member in guild.members:
+                user_data[str(member.id)] = {
+                    "id": member.id,
+                    "name": member.name,
+                    "discriminator": member.discriminator,
+                    "display_name": getattr(member, "display_name", member.name),
+                    "guild_id": guild.id,
+                    "guild_name": guild.name
+                }
+        try:
+            with open(self.USER_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(user_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"Cached {len(user_data)} users from all guilds to {self.USER_CACHE_FILE}")
+        except Exception as e:
+            logger.error(f"Failed to cache all users: {e}")
 
     async def populate_cache(self) -> None:
         for channel in self.bot.modmail_guild.text_channels:
             await self.find(channel=channel)
+        self._save_user_cache()
 
     def __len__(self):
         return len(self.cache)
@@ -1304,7 +1349,7 @@ class ThreadManager:
             thread = await self._find_from_channel(channel)
             if thread is None:
                 user_id, thread = next(
-                    ((k, v) for k, v in self.cache.items() if v.channel == channel), (-1, None)
+                    ((k, v) for k, v in self.cache.items() if v and v.channel == channel), (-1, None)
                 )
                 if thread is not None:
                     logger.debug("Found thread with tempered ID.")
@@ -1329,7 +1374,6 @@ class ThreadManager:
                     await thread.close(closer=self.bot.user, silent=True, delete_channel=False)
                     thread = None
         else:
-
             def check(topic):
                 _, user_id, other_ids = parse_channel_topic(topic)
                 return recipient_id == user_id or recipient_id in other_ids
@@ -1342,15 +1386,13 @@ class ThreadManager:
             if channel:
                 thread = await Thread.from_channel(self, channel)
                 if thread.recipient:
-                    # only save if data is valid.
-                    # also the recipient_id here could belong to other recipient,
-                    # it would be wrong if we set it as the dict key,
-                    # so we use the thread id instead
                     self.cache[thread.id] = thread
+                    self._save_user_cache()
                 thread.ready = True
 
         if thread and recipient_id not in [x.id for x in thread.recipients]:
             self.cache.pop(recipient_id)
+            self._save_user_cache()
             thread = None
 
         return thread
@@ -1391,6 +1433,7 @@ class ThreadManager:
             thread = Thread(self, user_id, channel, other_recipients)
         else:
             self.cache[user_id] = thread = Thread(self, recipient, channel, other_recipients)
+            self._save_user_cache()
         thread.ready = True
 
         return thread
@@ -1406,7 +1449,6 @@ class ThreadManager:
     ) -> Thread:
         """Creates a Modmail thread"""
 
-        # checks for existing thread in cache
         thread = self.cache.get(recipient.id)
         if thread:
             try:
@@ -1424,8 +1466,8 @@ class ThreadManager:
                 )
 
         thread = Thread(self, recipient)
-
         self.cache[recipient.id] = thread
+        self._save_user_cache()
 
         if (message or not manual_trigger) and self.bot.config["confirm_thread_creation"]:
             if not manual_trigger:
@@ -1467,6 +1509,7 @@ class ThreadManager:
                 )
             if thread.cancelled:
                 del self.cache[recipient.id]
+                self._save_user_cache()
                 return thread
 
         self.bot.loop.create_task(thread.setup(creator=creator, category=category, initial_message=message))

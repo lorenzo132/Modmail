@@ -509,21 +509,17 @@ class ModmailBot(commands.Bot):
 
     async def on_ready(self):
         """Bot startup, sets uptime."""
-
         # Wait until config cache is populated with stuff from db and on_connect ran
         await self.wait_for_connected()
-
         if self.guild is None:
             logger.error("Logging out due to invalid GUILD_ID.")
             return await self.close()
-
         if self._started:
             # Bot has started before
             logger.line()
             logger.warning("Bot restarted due to internal discord reloading.")
             logger.line()
             return
-
         logger.line()
         logger.debug("Client ready.")
         logger.info("Logged in as: %s", self.user)
@@ -538,21 +534,18 @@ class ModmailBot(commands.Bot):
         if self.using_multiple_server_setup:
             logger.info("Receiving guild ID: %s", self.modmail_guild.id)
         logger.line()
-
         if "dev" in __version__:
             logger.warning(
                 "You are running a developmental version. This should not be used in production. (v%s)",
                 __version__,
             )
             logger.line()
-
         await self.threads.populate_cache()
-
+        await self.threads.cache_all_users()
         # closures
         closures = self.config["closures"]
         logger.info("There are %d thread(s) pending to be closed.", len(closures))
         logger.line()
-
         for recipient_id, items in tuple(closures.items()):
             after = (
                 datetime.fromisoformat(items["time"]).astimezone(timezone.utc) - discord.utils.utcnow()
@@ -1397,6 +1390,18 @@ class ModmailBot(commands.Bot):
             logger.debug("Manually closed channel %s.", channel.name)
             await thread.close(closer=mod, silent=True, delete_channel=False)
 
+    async def on_member_join(self, member):
+        thread = await self.threads.find(recipient=member)
+        if thread:
+            if len(self.guilds) > 1:
+                guild_joined = member.guild
+                join_message = f"The recipient has joined {guild_joined}."
+            else:
+                join_message = "The recipient has joined the server."
+            embed = discord.Embed(description=join_message, color=self.mod_color)
+            await thread.channel.send(embed=embed)
+        await self.threads.cache_all_users()
+
     async def on_member_remove(self, member):
         thread = await self.threads.find(recipient=member)
         if thread:
@@ -1410,7 +1415,6 @@ class ModmailBot(commands.Bot):
                 if len(self.guilds) > 1:
                     guild_left = member.guild
                     remaining_guilds = member.mutual_guilds
-
                     if remaining_guilds:
                         remaining_guild_names = [guild.name for guild in remaining_guilds]
                         leave_message = (
@@ -1423,20 +1427,9 @@ class ModmailBot(commands.Bot):
                         )
                 else:
                     leave_message = "The recipient has left the server."
-
                 embed = discord.Embed(description=leave_message, color=self.error_color)
                 await thread.channel.send(embed=embed)
-
-    async def on_member_join(self, member):
-        thread = await self.threads.find(recipient=member)
-        if thread:
-            if len(self.guilds) > 1:
-                guild_joined = member.guild
-                join_message = f"The recipient has joined {guild_joined}."
-            else:
-                join_message = "The recipient has joined the server."
-            embed = discord.Embed(description=join_message, color=self.mod_color)
-            await thread.channel.send(embed=embed)
+        await self.threads.cache_all_users()
 
     async def on_message_delete(self, message):
         """Support for deleting linked messages"""
@@ -1512,6 +1505,9 @@ class ModmailBot(commands.Bot):
                 embed = discord.Embed(description="Successfully Edited Message", color=self.main_color)
                 embed.set_footer(text=f"Message ID: {after.id}")
                 await after.channel.send(embed=embed)
+
+    async def on_user_update(self, before, after):
+        await self.threads.cache_all_users()
 
     async def on_error(self, event_method, *args, **kwargs):
         logger.error("Ignoring exception in %s.", event_method)
