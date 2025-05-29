@@ -128,7 +128,7 @@ class PaginatorSession:
         await self._create_base(item, self.view)
 
     async def _create_base(self, item, view) -> None:
-        self.base = await send_v2_component_message(self.handler.ctx.bot, self.destination.id, components=embed_to_v2_components(item))
+        self.base = await send_v2_component_message(self.ctx.bot, self.destination.id, components=embed_to_v2_components(item))
 
     def _show_page(self, page):
         raise NotImplementedError
@@ -348,7 +348,7 @@ class EmbedPaginatorSession(PaginatorSession):
             raise TypeError("Page must be an Embed object.")
 
     async def _create_base(self, item: Embed, view) -> None:
-        self.base = await send_v2_component_message(self.handler.ctx.bot, self.destination.id, components=embed_to_v2_components(item))
+        self.base = await send_v2_component_message(self.ctx.bot, self.destination.id, components=embed_to_v2_components(item))
 
     def _show_page(self, page):
         return dict(embed=page)
