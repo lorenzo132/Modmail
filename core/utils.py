@@ -624,7 +624,7 @@ async def send_v2_component_message(bot, channel_id, content=None, embed=None, c
     await bot.http.request(
         discord.http.Route("POST", "/channels/{channel_id}/messages", channel_id=channel_id),
         data=json.dumps(payload),
-        content_type="application/json"
+        headers={"Content-Type": "application/json"}
     )
 
 
