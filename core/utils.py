@@ -629,7 +629,7 @@ def embed_to_v2_components(embed: discord.Embed) -> list:
     """
     Convert a discord.Embed to a list of Discord Components V2 components.
     - Main content as SECTION + TEXT_DISPLAY
-    - Thumbnail as THUMBNAIL
+    - Thumbnail as THUMBNAIL (as accessory)
     - Image as MEDIA_GALLERY (if present)
     """
     components = []
@@ -637,20 +637,21 @@ def embed_to_v2_components(embed: discord.Embed) -> list:
         "type": 9,  # SECTION
         "components": [
             {"type": 10, "content": (embed.description or embed.title or "")}
-        ]
+        ],
+        "accessory": None  # Always include accessory, default to None
     }
     # Thumbnail
     if embed.thumbnail and embed.thumbnail.url:
         section["accessory"] = {
             "type": 11,  # THUMBNAIL
-            "media": {"url": embed.thumbnail.url},
-            "description": None
+            "media": {"url": embed.thumbnail.url}
         }
+    # Add section
     components.append(section)
-    # Image
+    # Image as MEDIA_GALLERY
     if embed.image and embed.image.url:
         components.append({
             "type": 12,  # MEDIA_GALLERY
-            "items": [{"media": {"url": embed.image.url}, "description": None}]
+            "items": [{"media": {"url": embed.image.url}}]
         })
     return components
