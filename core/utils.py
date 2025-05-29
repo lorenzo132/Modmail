@@ -607,3 +607,50 @@ class DummyParam:
     def __init__(self, name):
         self.name = name
         self.displayed_name = name
+
+
+async def send_v2_component_message(bot, channel_id, content=None, embed=None, components=None):
+    payload = {}
+    if content:
+        payload["content"] = content
+    if embed:
+        payload["embeds"] = [embed.to_dict()]
+    if components:
+        payload["components"] = components
+    payload["flags"] = 1 << 15  # IS_COMPONENTS_V2
+
+    await bot.http.request(
+        discord.http.Route("POST", "/channels/{channel_id}/messages", channel_id=channel_id),
+        json=payload
+    )
+
+
+def embed_to_v2_components(embed: discord.Embed) -> list:
+    """
+    Convert a discord.Embed to a list of Discord Components V2 components.
+    - Main content as SECTION + TEXT_DISPLAY
+    - Thumbnail as THUMBNAIL
+    - Image as MEDIA_GALLERY (if present)
+    """
+    components = []
+    section = {
+        "type": 9,  # SECTION
+        "components": [
+            {"type": 10, "content": (embed.description or embed.title or "")}
+        ]
+    }
+    # Thumbnail
+    if embed.thumbnail and embed.thumbnail.url:
+        section["accessory"] = {
+            "type": 11,  # THUMBNAIL
+            "media": {"url": embed.thumbnail.url},
+            "description": None
+        }
+    components.append(section)
+    # Image
+    if embed.image and embed.image.url:
+        components.append({
+            "type": 12,  # MEDIA_GALLERY
+            "items": [{"media": {"url": embed.image.url}, "description": None}]
+        })
+    return components

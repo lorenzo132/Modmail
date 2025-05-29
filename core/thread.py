@@ -35,6 +35,7 @@ from core.utils import (
     DenyButton,
     ConfirmThreadCreationView,
     DummyParam,
+    send_v2_component_message,
 )
 
 logger = getLogger(__name__)
@@ -502,11 +503,26 @@ class Thread:
 
         if self.bot.log_channel is not None and self.channel is not None:
             if self.bot.config["show_log_url_button"]:
-                view = discord.ui.View()
-                view.add_item(discord.ui.Button(label="Log link", url=log_url, style=discord.ButtonStyle.url))
+                components = [
+                    {
+                        "type": 9,  # SECTION
+                        "components": [
+                            {
+                                "type": 10,  # TEXT_DISPLAY
+                                "content": "Log link below"
+                            }
+                        ],
+                        "accessory": {
+                            "type": 2,  # BUTTON
+                            "label": "Log link",
+                            "style": 5,  # Link button
+                            "url": log_url
+                        }
+                    }
+                ]
+                await send_v2_component_message(self.bot, self.bot.log_channel.id, embed=embed, components=components)
             else:
-                view = None
-            tasks.append(self.bot.log_channel.send(embed=embed, view=view))
+                await self.bot.log_channel.send(embed=embed)
 
         # Thread closed message
 
@@ -1183,7 +1199,48 @@ class Thread:
                 msg = await destination.send(mentions, embed=embed)
 
         else:
-            msg = await destination.send(mentions, embed=embed)
+            # Build V2 components for images and files
+            v2_components = []
+            text_section = {
+                "type": 9,  # SECTION
+                "components": [
+                    {
+                        "type": 10,  # TEXT_DISPLAY
+                        "content": message.content or ""
+                    }
+                ]
+            }
+            # Add thumbnail if there is an image
+            if images:
+                first_image = images[0]
+                if first_image[0]:
+                    text_section["accessory"] = {
+                        "type": 11,  # THUMBNAIL
+                        "media": {"url": first_image[0]},
+                        "description": first_image[1] or None
+                    }
+            v2_components.append(text_section)
+            # Add media gallery if more than one image
+            if len(images) > 1:
+                gallery = {
+                    "type": 12,  # MEDIA_GALLERY
+                    "items": [
+                        {"media": {"url": img[0]}, "description": img[1] or None} for img in images[1:] if img[0]
+                    ]
+                }
+                v2_components.append(gallery)
+            # Add file components
+            for url, filename, _ in attachments:
+                v2_components.append({
+                    "type": 13,  # FILE
+                    "file": {"url": url},
+                    "spoiler": False
+                })
+            # Send using V2 helper if any V2 components exist
+            if v2_components:
+                await send_v2_component_message(self.bot, destination.id, components=v2_components)
+            else:
+                msg = await destination.send(embed=embed)
 
         if additional_images:
             self.ready = False

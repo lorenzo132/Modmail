@@ -2,8 +2,8 @@ import typing
 
 import discord
 from discord import Message, Embed, ButtonStyle, Interaction
-from discord.ui import View, Button, Select
 from discord.ext import commands
+from core.utils import send_v2_component_message
 
 
 class PaginatorSession:
