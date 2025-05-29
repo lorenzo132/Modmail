@@ -620,11 +620,9 @@ async def send_v2_component_message(bot, channel_id, content=None, embed=None, c
         payload["components"] = components
     payload["flags"] = 1 << 15  # IS_COMPONENTS_V2
 
-    # Use json.dumps to ensure None is serialized as null
     await bot.http.request(
         discord.http.Route("POST", "/channels/{channel_id}/messages", channel_id=channel_id),
-        data=json.dumps(payload),
-        headers={"Content-Type": "application/json"}
+        json=payload
     )
 
 
