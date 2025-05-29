@@ -655,4 +655,8 @@ def embed_to_v2_components(embed: discord.Embed) -> list:
             "type": 12,  # MEDIA_GALLERY
             "items": [{"media": {"url": embed.image.url}}]
         })
+    # Failsafe: ensure every SECTION has 'accessory' key
+    for comp in components:
+        if comp.get("type") == 9 and "accessory" not in comp:
+            comp["accessory"] = None
     return components
