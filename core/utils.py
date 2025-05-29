@@ -7,6 +7,7 @@ from difflib import get_close_matches
 from distutils.util import strtobool as _stb  # pylint: disable=import-error
 from itertools import takewhile, zip_longest
 from urllib import parse
+import json
 
 import discord
 from discord.ext import commands
@@ -619,9 +620,11 @@ async def send_v2_component_message(bot, channel_id, content=None, embed=None, c
         payload["components"] = components
     payload["flags"] = 1 << 15  # IS_COMPONENTS_V2
 
+    # Use json.dumps to ensure None is serialized as null
     await bot.http.request(
         discord.http.Route("POST", "/channels/{channel_id}/messages", channel_id=channel_id),
-        json=payload
+        data=json.dumps(payload),
+        content_type="application/json"
     )
 
 
