@@ -127,7 +127,7 @@ class PaginatorSession:
 
         await self._create_base(item, self.view)
 
-    async def _create_base(self, item, view: View) -> None:
+    async def _create_base(self, item, view) -> None:
         raise NotImplementedError
 
     def _show_page(self, page):
@@ -198,7 +198,7 @@ class PaginatorSession:
                     await message.edit(view=self.view)
 
 
-class PaginatorView(View):
+class PaginatorView:
     """
     View that is used for pagination.
 
@@ -217,14 +217,13 @@ class PaginatorView(View):
         How long to wait for before the session closes.
     """
 
-    def __init__(self, handler: PaginatorSession, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, handler, timeout):
         self.handler = handler
         self.clear_items()  # clear first so we can control the order
         self.fill_items()
 
     @discord.ui.button(label="Stop", style=ButtonStyle.danger)
-    async def stop_button(self, interaction: Interaction, button: Button):
+    async def stop_button(self, interaction: Interaction, button):
         await self.handler.close(interaction=interaction)
 
     def fill_items(self):
@@ -256,7 +255,7 @@ class PaginatorView(View):
         return True
 
 
-class PageButton(Button):
+class PageButton:
     """
     A button that has a callback to jump to the next page
 
@@ -276,7 +275,6 @@ class PageButton(Button):
     """
 
     def __init__(self, handler, page_callback, **kwargs):
-        super().__init__(**kwargs)
         self.handler = handler
         self.page_callback = page_callback
 
@@ -285,7 +283,7 @@ class PageButton(Button):
         await interaction.response.edit_message(**kwargs, view=self.view)
 
 
-class PageSelect(Select):
+class PageSelect:
     def __init__(self, handler: PaginatorSession, pages: typing.List[typing.Tuple[str]]):
         self.handler = handler
         options = []
@@ -293,7 +291,7 @@ class PageSelect(Select):
             options.append(discord.SelectOption(label=label, description=description, value=str(n)))
 
         options = options[:25]  # max 25 options
-        super().__init__(placeholder="Select a page", min_values=1, max_values=1, options=options)
+        self.view = discord.ui.Select(placeholder="Select a page", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: Interaction):
         page = int(self.values[0])
@@ -349,7 +347,7 @@ class EmbedPaginatorSession(PaginatorSession):
         else:
             raise TypeError("Page must be an Embed object.")
 
-    async def _create_base(self, item: Embed, view: View) -> None:
+    async def _create_base(self, item: Embed, view) -> None:
         self.base = await self.destination.send(embed=item, view=view)
 
     def _show_page(self, page):
@@ -381,7 +379,7 @@ class MessagePaginatorSession(PaginatorSession):
 
             self.embed.set_footer(text=footer_text, icon_url=icon_url)
 
-    async def _create_base(self, item: str, view: View) -> None:
+    async def _create_base(self, item: str, view) -> None:
         self._set_footer()
         self.base = await self.ctx.send(content=item, embed=self.embed, view=view)
 
