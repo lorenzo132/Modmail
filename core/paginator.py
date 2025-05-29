@@ -3,7 +3,7 @@ import typing
 import discord
 from discord import Message, Embed, ButtonStyle, Interaction
 from discord.ext import commands
-from core.utils import send_v2_component_message
+from core.utils import send_v2_component_message, embed_to_v2_components
 
 
 class PaginatorSession:
@@ -128,7 +128,7 @@ class PaginatorSession:
         await self._create_base(item, self.view)
 
     async def _create_base(self, item, view) -> None:
-        raise NotImplementedError
+        self.base = await send_v2_component_message(self.handler.ctx.bot, self.destination.id, components=embed_to_v2_components(item))
 
     def _show_page(self, page):
         raise NotImplementedError
@@ -348,7 +348,7 @@ class EmbedPaginatorSession(PaginatorSession):
             raise TypeError("Page must be an Embed object.")
 
     async def _create_base(self, item: Embed, view) -> None:
-        self.base = await self.destination.send(embed=item, view=view)
+        self.base = await send_v2_component_message(self.handler.ctx.bot, self.destination.id, components=embed_to_v2_components(item))
 
     def _show_page(self, page):
         return dict(embed=page)
@@ -381,7 +381,10 @@ class MessagePaginatorSession(PaginatorSession):
 
     async def _create_base(self, item: str, view) -> None:
         self._set_footer()
-        self.base = await self.ctx.send(content=item, embed=self.embed, view=view)
+        if self.embed:
+            self.base = await send_v2_component_message(self.ctx.bot, self.ctx.channel.id, components=embed_to_v2_components(self.embed))
+        else:
+            self.base = await self.ctx.send(content=item)
 
     def _show_page(self, page) -> typing.Dict:
         self._set_footer()
