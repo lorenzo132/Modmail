@@ -219,8 +219,8 @@ class PaginatorView:
 
     def __init__(self, handler, timeout):
         self.handler = handler
-        self.clear_items()  # clear first so we can control the order
-        self.fill_items()
+        # self.clear_items()  # Remove this, not needed in V2
+        # self.fill_items()   # Remove this, not needed in V2
 
     @discord.ui.button(label="Stop", style=ButtonStyle.danger)
     async def stop_button(self, interaction: Interaction, button):
